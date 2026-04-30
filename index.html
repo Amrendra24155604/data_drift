@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Data Drift Monitor</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+      padding: 40px;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px auto;
+      width: 400px;
+    }
+
+    input {
+      margin: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      background: #38bdf8;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0ea5e9;
+    }
+
+    .result {
+      margin-top: 20px;
+      text-align: left;
+    }
+
+    .feature {
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 5px;
+    }
+
+    .low { background: #16a34a; }
+    .moderate { background: #f59e0b; }
+    .high { background: #dc2626; }
+  </style>
+</head>
+
+<body>
+
+  <h1>📊 Data Drift Monitor</h1>
+
+  <div class="card">
+    <h3>Upload Files</h3>
+
+    <input type="file" id="oldFile" />
+    <br>
+    <input type="file" id="newFile" />
+    <br><br>
+
+    <button onclick="detectDrift()">Detect Drift</button>
+
+    <div id="loading" style="display:none;">⏳ Processing...</div>
+  </div>
+
+  <div class="card result" id="output"></div>
+
+  <script>
+    async function detectDrift() {
+      const oldFile = document.getElementById("oldFile").files[0];
+      const newFile = document.getElementById("newFile").files[0];
+
+      if (!oldFile || !newFile) {
+        alert("Upload both files");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file_old", oldFile);
+      formData.append("file_new", newFile);
+
+      document.getElementById("loading").style.display = "block";
+      document.getElementById("output").innerHTML = "";
+
+      try {
+        const res = await fetch("http://127.0.0.1:8000/detect-drift/", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await res.json();
+
+        displayResult(data);
+
+      } catch (err) {
+        alert("Error connecting to backend");
+        console.error(err);
+      }
+
+      document.getElementById("loading").style.display = "none";
+    }
+
+    function displayResult(data) {
+      const output = document.getElementById("output");
+
+      let html = "<h3>📈 Drift Results</h3>";
+
+      const drift = data.drift_result;
+
+      for (let key in drift) {
+        const item = drift[key];
+
+        html += `
+          <div class="feature ${getClass(item.status)}">
+            <strong>${key}</strong><br>
+            PSI: ${item.psi.toFixed(4)} <br>
+            Status: ${item.status}
+          </div>
+        `;
+      }
+
+      if (data.ai_explanation) {
+        const exp = data.ai_explanation;
+
+        html += `
+          <h3>🤖 AI Explanation</h3>
+          <p><strong>Summary:</strong> ${exp.summary}</p>
+          <p><strong>Issues:</strong> ${exp.issues}</p>
+          <p><strong>Actions:</strong> ${exp.actions}</p>
+        `;
+      }
+
+      output.innerHTML = html;
+    }
+
+    function getClass(status) {
+      if (status.includes("high")) return "high";
+      if (status.includes("moderate")) return "moderate";
+      return "low";
+    }
+  </script>
+
+</body>
+</html>
